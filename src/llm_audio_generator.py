@@ -54,7 +54,7 @@ def main(
     args: Args
 ):
 
-    audio_gen = AudioGeneratorModel(args.audio_generator_checkpoint_path, args.audio_generator_config_path)
+    audio_gen = AudioGeneratorModel(args.audio_generator_checkpoint_path, args.audio_generator_config_path, device=args.device)
     llm = LLM(model_name=args.llm, ollama_api_url=args.ollama_api_url)
 
     llm_audio_gen = LLMAudioGenerator(audio_gen, llm)

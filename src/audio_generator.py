@@ -32,18 +32,47 @@ def sampels2wav(samples, rate=16_000):
     audio_file = ipd.Audio(samples, rate=rate, normalize=False)
     return audio_file.data
 
+def _load_checkpoint(checkpoint_path, model, optimizer=None, device='cpu'):
+  """ modified version to load data directly to gpu"""
+  assert utils.os.path.isfile(checkpoint_path)
+  checkpoint_dict = torch.load(checkpoint_path, map_location=device)
+  iteration = checkpoint_dict['iteration']
+  learning_rate = checkpoint_dict['learning_rate']
+  if optimizer is not None:
+    optimizer.load_state_dict(checkpoint_dict['optimizer'])
+  saved_state_dict = checkpoint_dict['model']
+  if hasattr(model, 'module'):
+    state_dict = model.module.state_dict()
+  else:
+    state_dict = model.state_dict()
+  new_state_dict= {}
+  for k, v in state_dict.items():
+    try:
+      new_state_dict[k] = saved_state_dict[k]
+    except:
+      utils.logger.info("%s is not in the checkpoint" % k)
+      new_state_dict[k] = v
+  if hasattr(model, 'module'):
+    model.module.load_state_dict(new_state_dict)
+  else:
+    model.load_state_dict(new_state_dict)
+  utils.logger.info("Loaded checkpoint '{}' (iteration {})" .format(
+    checkpoint_path, iteration))
+  return model, optimizer, learning_rate, iteration
+
 class AudioGeneratorModel:
 
-    def __init__(self, checkpoint_path: str = DEFAULT_CHECKPOINT_PATH, config_path: str = DEFAULT_CONFIG_PATH):
+    def __init__(self, checkpoint_path: str = DEFAULT_CHECKPOINT_PATH, config_path: str = DEFAULT_CONFIG_PATH, device: str = "cpu"):
         self.hps = utils.get_hparams_from_file(config_path)
 
         self.net_g = SynthesizerTrn(
             len(symbols),
             self.hps.data.filter_length // 2 + 1,
             self.hps.train.segment_size // self.hps.data.hop_length,
-            **self.hps.model)
+            **self.hps.model).to(device=device)
         _ = self.net_g.eval()
-        _ = utils.load_checkpoint(checkpoint_path, self.net_g, None)
+        _ = _load_checkpoint(checkpoint_path, self.net_g, None, device=device)
+        self.device = device
     
     @property
     def rate(self):
@@ -60,8 +89,8 @@ class AudioGeneratorModel:
         stn_tst = get_text(text, self.hps)
 
         with torch.no_grad():
-            x_tst = stn_tst.unsqueeze(0)
-            x_tst_lengths = torch.LongTensor([stn_tst.size(0)])
+            x_tst = stn_tst.to(device=self.device).unsqueeze(0)
+            x_tst_lengths = torch.LongTensor([stn_tst.size(0)]).to(device=self.device)
             audio = self.net_g.infer(x_tst, x_tst_lengths, noise_scale=.667, noise_scale_w=0.8, length_scale=1)[0][0,0].data.cpu().float().numpy()
 
         elapsed = default_timer() - start_time
