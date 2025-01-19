@@ -5,7 +5,7 @@ import traceback
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
 DEFAULT_MODEL = "llama3.2:1b"
 
-def query_model(question: str, model_name: str = DEFAULT_MODEL, debug=False):
+def query_model(question: str, model_name: str = DEFAULT_MODEL, ollama_api_url: str = OLLAMA_API_URL, debug=False):
   
     # Construct the request payload
     payload = {
@@ -18,7 +18,7 @@ def query_model(question: str, model_name: str = DEFAULT_MODEL, debug=False):
 
     # Send the request to the Ollama API
     try:
-        with requests.post(OLLAMA_API_URL, json=payload, stream=True, headers={
+        with requests.post(ollama_api_url, json=payload, stream=True, headers={
             "Content-Type": "application/json"
         }) as response:
             response.raise_for_status()
@@ -74,6 +74,20 @@ def test_generate_wavs():
     for sentence in sentence_iterator(generator):
         audio_raw = model(sentence)
         play(audio_raw, model.rate)
+
+class LLM:
+    def __init__(self, model_name: str = DEFAULT_MODEL, ollama_api_url: str = OLLAMA_API_URL, debug=False):
+        self.model_name = model_name
+        self.ollama_api_url = ollama_api_url
+        self.debug = debug
+
+    
+    def query(self, question: str):
+        return query_model(question, model_name=self.model_name, ollama_api_url=self.ollama_api_url, debug=self.debug)
+
+    def query_sentences(self, question: str):
+        return sentence_iterator(self.query(question))
+        
 
 
 if __name__ == "__main__":

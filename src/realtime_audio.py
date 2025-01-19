@@ -7,9 +7,19 @@ from collections import deque
 from timeit import default_timer
 from typing import Callable, Literal
 
+DEFAULT_TRANSCRIPTION_MODEL = "small.en"
+DEFAULT_DEVICE = "cpu"
+DEFAULT_WAKEWORD_MODEL = "hey_jarvis"
+DEFAULT_BUFFER_DURATION = 5
+
 class RealtimeTranscription:
 
-    def __init__(self, transcription_model="small.en", device='cpu', rate=16_000, buffer_duration=5, wakeword_model="hey_jarvis"):
+    def __init__(self, 
+                 transcription_model=DEFAULT_TRANSCRIPTION_MODEL, 
+                 device=DEFAULT_DEVICE, 
+                 rate=16_000, 
+                 buffer_duration=DEFAULT_BUFFER_DURATION,
+                 wakeword_model=DEFAULT_WAKEWORD_MODEL):
 
         # Initialize Whisper model
         # model = whisper.load_model("base")
@@ -74,11 +84,12 @@ class RealtimeTranscription:
             if len(segments) != 0:
                 text = " ".join(map(lambda x: x['text'], segments))
                 elapsed = default_timer() - start_time
-                print(f"=> Transription ({self.transcription_model_name}): {text} [in {elapsed}s]")
+                print(f"=> Audio Transription ({self.transcription_model_name}): {text} [in {elapsed}s]")
 
                 for callback in self.callbacks:
                     callback(text)
-            
+                    
+            self.audio_buffer.clear()
             self.state = 'wake_detection'
 
     def __call__(self):

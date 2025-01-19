@@ -18,6 +18,8 @@ from text import text_to_sequence
 from pathlib import Path
 import tempfile
 
+DEFAULT_CHECKPOINT_PATH = "vits/pretrained_ljs.pth"
+DEFAULT_CONFIG_PATH = "vits/configs/ljs_base.json"
 
 def get_text(text, hps):
     text_norm = text_to_sequence(text, hps.data.text_cleaners)
@@ -32,8 +34,8 @@ def sampels2wav(samples, rate=16_000):
 
 class AudioGeneratorModel:
 
-    def __init__(self, checkpoint_path: str = "vits/pretrained_ljs.pth"):
-        self.hps = utils.get_hparams_from_file("./vits/configs/ljs_base.json")
+    def __init__(self, checkpoint_path: str = DEFAULT_CHECKPOINT_PATH, config_path: str = DEFAULT_CONFIG_PATH):
+        self.hps = utils.get_hparams_from_file(config_path)
 
         self.net_g = SynthesizerTrn(
             len(symbols),

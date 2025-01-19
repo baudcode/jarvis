@@ -1,21 +1,28 @@
 from .audio_generator import AudioGeneratorModel, play
 from .realtime_audio import RealtimeTranscription
-from .llm import sentence_iterator, query_model
+from .llm import LLM, OLLAMA_API_URL
+
+from . import llm, audio_generator, realtime_audio
 
 from threading import Thread
 import time
+import dataclasses
+
+
 
 class LLMAudioGenerator:
-    def __init__(self, audio_gen: AudioGeneratorModel):
+    def __init__(self, audio_gen: AudioGeneratorModel, llm: LLM):
         self.audio_gen = audio_gen
+        self.llm = llm
 
     def query(self, question: str):
-        
-        gen = query_model(question)
+
+        question = "Do not repeat the question! Answer precisely in two or three sentences the following question: " + question       
+        gen = self.llm.query_sentences(question)
 
         play_thread: Thread = None
 
-        for sentence in sentence_iterator(gen):
+        for sentence in gen:
             print(f"=> llm respponse sentence: {sentence}")
             samples = self.audio_gen(sentence)
             print("=> playing sample")
@@ -27,12 +34,37 @@ class LLMAudioGenerator:
 
             play_thread = Thread(target=play, args=(samples, self.audio_gen.rate))
             play_thread.start()
-            
-def main():
-    
-    llm = LLMAudioGenerator(AudioGeneratorModel())
-    rt = RealtimeTranscription()
-    rt.register_callback(llm.query)
+        
+        if play_thread:
+            play_thread.join()
+
+
+@dataclasses.dataclass
+class Args:
+    audio_generator_checkpoint_path: str = audio_generator.DEFAULT_CHECKPOINT_PATH
+    audio_generator_config_path: str = audio_generator.DEFAULT_CONFIG_PATH
+    ollama_api_url: str = llm.OLLAMA_API_URL
+    llm: str = llm.DEFAULT_MODEL
+    transcription_model: str = realtime_audio.DEFAULT_TRANSCRIPTION_MODEL
+    buffer_duration: int = realtime_audio.DEFAULT_BUFFER_DURATION
+    device: str = "cpu" # gpu not fully supported yet
+    wakeword_model: str = realtime_audio.DEFAULT_WAKEWORD_MODEL
+
+def main(
+    args: Args
+):
+
+    audio_gen = AudioGeneratorModel(args.audio_generator_checkpoint_path, args.audio_generator_config_path)
+    llm = LLM(model_name=args.llm, ollama_api_url=args.ollama_api_url)
+
+    llm_audio_gen = LLMAudioGenerator(audio_gen, llm)
+    rt = RealtimeTranscription(
+        transcription_model=args.transcription_model,
+        buffer_duration=args.buffer_duration,
+        device=args.device,
+        wakeword_model=args.wakeword_model
+    )
+    rt.register_callback(llm_audio_gen.query)
     
     # run on audio
     rt()
